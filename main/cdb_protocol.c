@@ -8,6 +8,7 @@
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 
+#include "audio.h"
 #include "ble_nus.h"
 #include "face.h"
 
@@ -173,6 +174,15 @@ on_snapshot(const cJSON *obj)
      * are noise — the aperture already conveys those states. */
     bool show_msg = (state == FACE_STATE_BUSY ||
                      state == FACE_STATE_ATTENTION);
+
+    /* Audible chime on the leading edge of ATTENTION — only when we
+     * transition INTO that state, not on subsequent keepalives that
+     * re-assert it. */
+    static face_state_t s_last_state = FACE_STATE_SLEEP;
+    if (state == FACE_STATE_ATTENTION && s_last_state != FACE_STATE_ATTENTION) {
+        audio_play_attention();
+    }
+    s_last_state = state;
 
     bsp_display_lock(-1);
     /* A fresh snapshot takes precedence over any pending auto-revert. */

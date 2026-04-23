@@ -81,10 +81,15 @@ main/
   face.c / face.h    -- LVGL aperture + message + decision buttons + passkey panel
   ble_nus.c / .h     -- Nordic UART Service GATT, LE-SC pairing, bond store
   cdb_protocol.c /.h -- newline-JSON framer + dispatch + status ack
+  audio.c / .h       -- I2S + ES8311 chime on ATTENTION
   idf_component.yml  -- depends on waveshare BSP + esp_hosted + esp_wifi_remote
 tools/
   fake_buddy         -- local BLE central for driving the face without Claude Desktop
   fake_buddy.py      -- the script
+case/
+  WaveShare-untested.step
+                     -- first-pass enclosure STEP, NOT YET printed/tested
+  README.md          -- print notes + caveats
 DESIGN.md            -- face design doc (7-state visual language)
 claude-desktop-buddy-port.md
                      -- original porting plan + protocol summary
@@ -92,6 +97,14 @@ sdkconfig.defaults   -- load-bearing config (pre-v3 P4 landmines documented inli
 partitions.csv       -- custom 4 MB factory app partition
 CMakeLists.txt       -- disables -msmall-data-limit (pre-v3 P4 .sdata quirk)
 ```
+
+## Enclosure
+
+A first-pass STEP file lives under [`case/`](./case/). It has not
+been printed or test-fitted to real hardware yet — treat it as a
+starting point, not a finished design. See
+[`case/README.md`](./case/README.md) for print notes and how to
+report what fits / what doesn't.
 
 ## Why "Claude Face"
 

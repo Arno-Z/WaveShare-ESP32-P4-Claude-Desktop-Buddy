@@ -8,9 +8,10 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 
-#include "face.h"
+#include "audio.h"
 #include "ble_nus.h"
 #include "cdb_protocol.h"
+#include "face.h"
 
 static const char *TAG = "claude-face";
 
@@ -73,6 +74,10 @@ void app_main(void)
     };
     bsp_display_start_with_config(&cfg);
     bsp_display_backlight_on();
+
+    if (audio_init() != ESP_OK) {
+        ESP_LOGW(TAG, "audio init failed — running silent");
+    }
 
     bsp_display_lock(-1);
     face_build(lv_screen_active());
