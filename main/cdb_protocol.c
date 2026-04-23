@@ -175,14 +175,21 @@ on_snapshot(const cJSON *obj)
     bool show_msg = (state == FACE_STATE_BUSY ||
                      state == FACE_STATE_ATTENTION);
 
-    /* Audible chime on the leading edge of ATTENTION — only when we
-     * transition INTO that state, not on subsequent keepalives that
-     * re-assert it. */
-    static face_state_t s_last_state = FACE_STATE_SLEEP;
-    if (state == FACE_STATE_ATTENTION && s_last_state != FACE_STATE_ATTENTION) {
+    /* Audible chime whenever a NEW permission request lands. Gate on
+     * the prompt id rather than the face state — a fresh prompt with
+     * a new id should re-chime even if we were already in ATTENTION,
+     * while repeated keepalives with the same id stay silent. */
+    static char s_last_chimed_id[sizeof(s_pending_id)] = {0};
+    if (state == FACE_STATE_ATTENTION &&
+        s_has_pending_prompt &&
+        strcmp(s_last_chimed_id, s_pending_id) != 0) {
         audio_play_attention();
+        strncpy(s_last_chimed_id, s_pending_id, sizeof(s_last_chimed_id) - 1);
+        s_last_chimed_id[sizeof(s_last_chimed_id) - 1] = '\0';
+    } else if (state != FACE_STATE_ATTENTION) {
+        /* Clear the id so the next ATTENTION (even same prompt) rings. */
+        s_last_chimed_id[0] = '\0';
     }
-    s_last_state = state;
 
     bsp_display_lock(-1);
     /* A fresh snapshot takes precedence over any pending auto-revert. */
@@ -304,6 +311,8 @@ void cdb_protocol_decide_prompt(const char *decision)
     send_line(buf);
 
     bool approved = (strcmp(decision, "deny") != 0);
+    if (approved) audio_play_approve();
+    else          audio_play_deny();
     bsp_display_lock(-1);
     face_set_state(approved ? FACE_STATE_APPROVED : FACE_STATE_DENIED);
     face_set_hint("");

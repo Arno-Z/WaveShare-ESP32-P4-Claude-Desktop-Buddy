@@ -46,20 +46,37 @@ def snap(total=1, running=0, waiting=0, msg="", prompt: Optional[dict] = None,
     return payload
 
 
-SCENARIOS = {
-    "s": ("SLEEP (total=0)",            snap(total=0, msg="nothing open")),
-    "i": ("IDLE",                       snap(total=3, msg="3 idle")),
-    "b": ("BUSY (running=1)",           snap(total=3, running=1, msg="generating response", tokens=4200)),
-    "a": ("ATTENTION + prompt: Bash",   snap(total=3, waiting=1, msg="approve: Bash",
-                                             prompt={"id": "req_test01", "tool": "Bash", "hint": "uptime"})),
-    "A": ("ATTENTION + prompt: Filesystem", snap(total=3, waiting=1, msg="approve: Filesystem",
-                                                 prompt={"id": "req_fs02", "tool": "Filesystem",
-                                                         "hint": "/Users/arno/Documents/*"})),
-    "o": ("send owner Felix",           {"cmd": "owner", "name": "Felix"}),
-    "n": ("send name Clawd",            {"cmd": "name",  "name": "Clawd"}),
-    "t": ("send status query",          {"cmd": "status"}),
-    "u": ("send unpair",                {"cmd": "unpair"}),
-}
+def scenario_for_key(key: str, seq: int) -> Optional[tuple[str, dict]]:
+    """Build a scenario on demand. Prompt ids rotate with `seq` so each
+    `a`/`A` press rings the attention chime — the firmware chimes on a
+    new prompt id, not on every heartbeat."""
+    if key == "s":
+        return ("SLEEP (total=0)", snap(total=0, msg="nothing open"))
+    if key == "i":
+        return ("IDLE", snap(total=3, msg="3 idle"))
+    if key == "b":
+        return ("BUSY (running=1)",
+                snap(total=3, running=1, msg="generating response", tokens=4200))
+    if key == "a":
+        return (f"ATTENTION + prompt: Bash #{seq}",
+                snap(total=3, waiting=1, msg="approve: Bash",
+                     prompt={"id": f"req_bash_{seq:03d}",
+                             "tool": "Bash", "hint": "uptime"}))
+    if key == "A":
+        return (f"ATTENTION + prompt: Filesystem #{seq}",
+                snap(total=3, waiting=1, msg="approve: Filesystem",
+                     prompt={"id": f"req_fs_{seq:03d}",
+                             "tool": "Filesystem",
+                             "hint": "/Users/arno/Documents/*"}))
+    if key == "o":
+        return ("send owner Felix", {"cmd": "owner", "name": "Felix"})
+    if key == "n":
+        return ("send name Clawd",  {"cmd": "name",  "name": "Clawd"})
+    if key == "t":
+        return ("send status query", {"cmd": "status"})
+    if key == "u":
+        return ("send unpair",       {"cmd": "unpair"})
+    return None
 
 HELP = """\
 Keys:
@@ -113,6 +130,7 @@ async def send_json(client: BleakClient, obj: dict) -> None:
 async def repl(client: BleakClient) -> None:
     print(HELP)
     loop = asyncio.get_running_loop()
+    seq = 0
     while True:
         try:
             key = await loop.run_in_executor(None, input, "> ")
@@ -125,7 +143,8 @@ async def repl(client: BleakClient) -> None:
             return
         if key == "?":
             print(HELP); continue
-        entry = SCENARIOS.get(key)
+        seq += 1
+        entry = scenario_for_key(key, seq)
         if not entry:
             print(f"  unknown key {key!r} — '?' for help"); continue
         label, obj = entry

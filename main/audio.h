@@ -10,3 +10,9 @@ esp_err_t audio_init(void);
 /* Soft chime that fires when a permission prompt arrives. Returns
  * immediately; playback happens on a dedicated task. */
 void audio_play_attention(void);
+
+/* Bright ascending pluck when a permission is approved. */
+void audio_play_approve(void);
+
+/* Short muted descending tone when a permission is denied. */
+void audio_play_deny(void);

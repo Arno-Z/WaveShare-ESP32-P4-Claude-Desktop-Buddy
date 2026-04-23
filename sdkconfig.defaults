@@ -96,3 +96,7 @@ CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
 CONFIG_BT_NIMBLE_SM_SC=y
 # CONFIG_BT_NIMBLE_SM_LEGACY is not set
 CONFIG_BT_NIMBLE_MAX_BONDS=8
+# Persist bonds in NVS so reboots / reflashes survive the LTK. Without
+# this the device reports "peer removed pairing information" after
+# every power cycle.
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
