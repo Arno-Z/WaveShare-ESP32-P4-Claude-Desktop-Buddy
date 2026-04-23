@@ -13,9 +13,17 @@ CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
-# Custom partition table: 4 MB factory app (1 MB default is too small once BT ships).
+# Custom partition table: 4 MB factory app (1 MB default is too small once BT ships)
+# plus an 8 MB "storage" SPIFFS for Phase 4 folder-push assets.
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# BSP SPIFFS — format on first mount so we ship flashable without a
+# pre-built fs image, and raise max open files (folder push streams
+# several files sequentially but we keep a few handles around for
+# manifest parsing later).
+CONFIG_BSP_SPIFFS_FORMAT_ON_MOUNT_FAIL=y
+CONFIG_BSP_SPIFFS_MAX_FILES=16
 
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 

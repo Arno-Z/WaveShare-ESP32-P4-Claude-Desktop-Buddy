@@ -8,6 +8,7 @@
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 
+#include "asset_push.h"
 #include "audio.h"
 #include "ble_nus.h"
 #include "face.h"
@@ -240,11 +241,16 @@ dispatch(const cJSON *obj)
                    strcmp(name, "file") == 0 ||
                    strcmp(name, "file_end") == 0 ||
                    strcmp(name, "chunk") == 0) {
-            /* Folder push — Phase 4. Decline for now by not acking
-             * char_begin; the desktop times out and tells the user. */
-            if (strcmp(name, "char_begin") != 0) {
-                send_ack(name, false, 0);
-            }
+            /* Phase 4 folder push — SPIFFS-backed. */
+            bool ok = false;
+            int  nbytes = 0;
+            bool handled = false;
+            if      (!strcmp(name, "char_begin")) handled = asset_push_handle_char_begin(obj, &ok, &nbytes);
+            else if (!strcmp(name, "file"))       handled = asset_push_handle_file      (obj, &ok, &nbytes);
+            else if (!strcmp(name, "chunk"))      handled = asset_push_handle_chunk     (obj, &ok, &nbytes);
+            else if (!strcmp(name, "file_end"))   handled = asset_push_handle_file_end  (obj, &ok, &nbytes);
+            else if (!strcmp(name, "char_end"))   handled = asset_push_handle_char_end  (obj, &ok, &nbytes);
+            if (handled) send_ack(name, ok, nbytes);
         } else {
             ESP_LOGI(TAG, "unknown cmd: %s", name);
         }

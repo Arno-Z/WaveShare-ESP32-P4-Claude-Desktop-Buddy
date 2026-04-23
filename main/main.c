@@ -8,6 +8,7 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 
+#include "asset_push.h"
 #include "audio.h"
 #include "ble_nus.h"
 #include "cdb_protocol.h"
@@ -77,6 +78,9 @@ void app_main(void)
 
     if (audio_init() != ESP_OK) {
         ESP_LOGW(TAG, "audio init failed — running silent");
+    }
+    if (asset_push_init() != ESP_OK) {
+        ESP_LOGW(TAG, "SPIFFS mount failed — folder push disabled");
     }
 
     bsp_display_lock(-1);

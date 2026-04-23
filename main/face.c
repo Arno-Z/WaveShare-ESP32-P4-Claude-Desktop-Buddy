@@ -24,6 +24,13 @@ static lv_obj_t *g_passkey_caption;
 static lv_anim_t  g_breath_anim;
 static lv_timer_t *g_msg_fade_timer;
 
+/* Cross-fade state — LVGL anims are stateful per (object, exec_cb)
+ * pair, so a single source/target pair is safe as long as we don't
+ * start two fades in parallel. */
+static lv_color_t g_cur_color;
+static lv_color_t g_fade_from;
+static lv_color_t g_fade_to;
+
 static face_decision_cb_t g_decision_cb;
 
 static void aperture_size_cb(void *obj, int32_t v)
@@ -101,6 +108,9 @@ void face_build(lv_obj_t *parent)
     // Core — the lens itself. Warm Anthropic-ish orange.
     g_aperture_core  = make_disc(parent, APERTURE_MIN,
                                  lv_color_hex(0xFF6B35), LV_OPA_COVER);
+    /* Seed the cross-fade tracking so the first state change has a
+     * sane "from" color to interpolate from. */
+    g_cur_color = lv_color_hex(0xFF6B35);
 
     // Message line above the aperture so the decision buttons below
     // have the unobstructed bottom half of the round panel.
@@ -190,6 +200,48 @@ static void start_breath(int32_t lo, int32_t hi, uint32_t period_ms)
     lv_anim_start(&g_breath_anim);
 }
 
+/* Cross-fade helpers. The exec callback is the second arg to
+ * lv_anim_set_exec_cb; LVGL keys active anims on (var, exec_cb) so we
+ * need a named function rather than a lambda. */
+static void color_fade_cb(void *obj, int32_t v)
+{
+    lv_color_t c = lv_color_mix(g_fade_to, g_fade_from, (uint8_t)v);
+    lv_obj_set_style_bg_color((lv_obj_t *)obj, c, 0);
+}
+
+static void start_color_fade(lv_obj_t *obj, uint32_t hex_to, uint32_t ms)
+{
+    g_fade_from = g_cur_color;
+    g_fade_to   = lv_color_hex(hex_to);
+    g_cur_color = g_fade_to;
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_exec_cb(&a, color_fade_cb);
+    lv_anim_set_values(&a, 0, 255);
+    lv_anim_set_duration(&a, ms);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
+/* Single-shot size tween with playback overshoot — used for the
+ * APPROVED bloom. Starts from the aperture's current size. */
+static void start_bloom(int32_t peak, int32_t settle, uint32_t rise_ms, uint32_t fall_ms)
+{
+    lv_anim_delete(g_aperture_core, aperture_size_cb);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, g_aperture_core);
+    lv_anim_set_exec_cb(&a, aperture_size_cb);
+    lv_anim_set_values(&a, settle, peak);
+    lv_anim_set_duration(&a, rise_ms);
+    lv_anim_set_playback_duration(&a, fall_ms);
+    lv_anim_set_repeat_count(&a, 1);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
 static void show_decision_buttons(bool show)
 {
     lv_obj_t *btns[] = { g_btn_deny, g_btn_approve };
@@ -252,33 +304,34 @@ void face_set_state(face_state_t state)
     case FACE_STATE_SLEEP:
         lv_anim_delete(g_aperture_core, aperture_size_cb);
         lv_obj_set_size(g_aperture_core, APERTURE_MIN, 4);  // closed slit
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0x5A3A20), 0);
+        start_color_fade(g_aperture_core, 0x5A3A20, 350);
         break;
     case FACE_STATE_IDLE:
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0xFF6B35), 0);
+        start_color_fade(g_aperture_core, 0xFF6B35, 350);
         start_breath(APERTURE_MIN, APERTURE_MAX, APERTURE_BREATH_MS);
         break;
     case FACE_STATE_BUSY:
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0xFFA04A), 0);
+        start_color_fade(g_aperture_core, 0xFFA04A, 220);
         start_breath(APERTURE_MIN + 20, APERTURE_MAX, APERTURE_BREATH_MS / 3);
         break;
     case FACE_STATE_ATTENTION:
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0xFFB340), 0);
+        /* Fast-ish transition so the user feels the urgency. */
+        start_color_fade(g_aperture_core, 0xFFB340, 180);
         start_breath(APERTURE_MAX - 30, APERTURE_MAX + 30, 900);
         break;
     case FACE_STATE_APPROVED:
-        // Solid pink bloom at full size — a short confirmation flash.
-        lv_anim_delete(g_aperture_core, aperture_size_cb);
-        lv_obj_set_size(g_aperture_core, APERTURE_MAX, APERTURE_MAX);
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0xE88FB0), 0);
+        /* Pink bloom overshoot — grows past full size then settles. */
+        start_color_fade(g_aperture_core, 0xE88FB0, 140);
+        start_bloom(APERTURE_MAX + 30, APERTURE_MAX, 140, 260);
         break;
     case FACE_STATE_DENIED:
+        /* Quick contract + muted grey. */
         lv_anim_delete(g_aperture_core, aperture_size_cb);
         lv_obj_set_size(g_aperture_core, APERTURE_MIN, APERTURE_MIN);
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0x6B6B6B), 0);
+        start_color_fade(g_aperture_core, 0x6B6B6B, 180);
         break;
     case FACE_STATE_CELEBRATE:
-        lv_obj_set_style_bg_color(g_aperture_core, lv_color_hex(0xFFD66B), 0);
+        start_color_fade(g_aperture_core, 0xFFD66B, 300);
         start_breath(APERTURE_MIN, APERTURE_MAX + 40, 700);
         break;
     }
