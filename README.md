@@ -21,11 +21,19 @@ the desktop. All over AES-CCM-encrypted BLE with LE Secure Connections bonding.
   Multiple macs supported (up to 8 bonds).
 - **State mirroring**: `total/running/waiting` snapshots drive a 7-state face
   — SLEEP, IDLE, BUSY, ATTENTION, APPROVED, DENIED, CELEBRATE — each with its
-  own colour + breathing animation.
+  own colour + breathing animation. Transitions cross-fade between states;
+  APPROVED blooms past full size then settles.
 - **Permission prompts**: when Claude asks for tool approval the face flips
   amber, shows the tool + command hint, and presents **Approve** / **Deny**
   buttons on the touchscreen. Decision streams back as
   `{"cmd":"permission","id":"…","decision":"once"|"deny"}`.
+- **Audio feedback**: ES8311 + speaker. Soft two-tone chime on ATTENTION
+  (keyed off a new prompt id, not every heartbeat); bright pluck on Approve;
+  low muted thud on Deny.
+- **Folder push**: the Hardware Buddy window's drop target works — dropped
+  folders stream into `/spiffs/assets/<name>/` via the
+  `char_begin`/`file`/`chunk`/`file_end`/`char_end` protocol, with path
+  sanitation.
 - **Commands implemented**: `status` (with live uptime, heap, encryption flag),
   `owner`, `name`, `unpair` (erases all stored bonds).
 - **Testing harness**: `tools/fake_buddy` — a Python BLE central that
@@ -33,11 +41,14 @@ the desktop. All over AES-CCM-encrypted BLE with LE Secure Connections bonding.
 
 ## What's still ahead
 
-- Folder-push support (`char_begin`/`file`/`chunk`/…) — docs pages, images,
-  firmware can be dropped into the Hardware Buddy window for receipt.
-- Audio feedback: soft chime on ATTENTION via the ES8311 codec + speaker.
-- Richer face animations: transition tweens, sparkle on APPROVED.
-- Battery / charging telemetry in the `status` ack.
+- Do something useful with pushed assets — wire SPIFFS content into the face
+  (custom character images, mascot sprites, WAV chimes loaded from dropped
+  folders).
+- Battery / charging telemetry in the `status` ack (currently reports name,
+  sec, up, heap only).
+- CELEBRATE state is drawn but never fires — no upstream signal for it yet.
+- Chase the harmless-but-ugly `ledc: GPIO 26 is not usable` warning at boot
+  (LCD backlight PWM channel collision with the BSP display init order).
 
 ## Hardware
 
