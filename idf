@@ -1,0 +1,7 @@
+#!/bin/sh
+# Tiny wrapper so idf.py runs with ESP-IDF's env sourced.
+# Lets .claude/settings.local.json allow `Bash(./idf *)` cleanly,
+# sidestepping permission-matcher confusion on compound `source && idf.py` chains.
+set -e
+. "$HOME/esp/esp-idf/export.sh" >/dev/null
+exec idf.py "$@"

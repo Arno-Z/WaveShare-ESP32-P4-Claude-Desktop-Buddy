@@ -1,0 +1,98 @@
+# Matches Waveshare's 08_lvgl_demo_v9 baseline (known-good on this board).
+# Adjustments only for: flash size (32 MB vs their 16 MB), chip rev (our v1.0),
+# and our narrower LVGL font selection.
+
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+# Min v0.1 (not v1.0) — matches Waveshare's known-good baseline and
+# sidesteps an IDF-5.5 linker regression with the v1.0-specific
+# workarounds.  Our v1.0 silicon still boots fine under this floor.
+CONFIG_ESP32P4_REV_MIN_1=y
+
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# Custom partition table: 4 MB factory app (1 MB default is too small once BT ships).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+# L2 cache 128 KB (not Waveshare's 256 KB): on pre-v3 P4 the SRAM
+# is split into sram_low (~180 KB dram_seg) and sram_high (0x80000 -
+# L2). 256 KB L2 leaves sram_high at 256 KB, which isn't enough for
+# IDF 5.5's .sdata overflow from the BSP's component chain. 128 KB L2
+# gives sram_high = 384 KB, and the non-contiguous-regions linker
+# flag successfully places the overflow there.
+CONFIG_CACHE_L2_CACHE_128KB=y
+CONFIG_CACHE_L2_CACHE_LINE_128B=y
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
+CONFIG_FREERTOS_HZ=1000
+
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_STRING=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_DEF_REFR_PERIOD=15
+CONFIG_LV_OS_FREERTOS=y
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
+# On pre-v3 P4, sram_high is RW-only per memory.ld.in, so .iram0.text
+# can only live in the 179 KB sram_low region. Placing LVGL's hot
+# functions in IRAM consumes ~112 KB there — leaving no room for
+# spi_flash/newlib/heap IRAM code, which get silently discarded by
+# --enable-non-contiguous-regions. Keeping LVGL in flash (XIP from
+# PSRAM via .text) is fine for a 15 ms refresh face at 800x800.
+CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
+
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_26=y
+# Passkey display during pairing wants something readable from across a desk.
+CONFIG_LV_FONT_MONTSERRAT_48=y
+
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+
+# IDF 5.5 defaults these to y, but for pre-v3 P4 silicon the atomic
+# shims + libc locks overflow IRAM. Relocating to flash; we pay a
+# small perf cost on these paths, which we don't care about for a
+# face/buddy.
+CONFIG_LIBC_MISC_IN_IRAM=n
+CONFIG_LIBC_LOCKS_PLACE_IN_IRAM=n
+
+# Move the heap component (tlsf + multi_heap) from IRAM to flash.
+# Safe because we never call esp_heap_caps APIs from cache-disabled
+# contexts (no IRAM ISRs touch the heap).
+CONFIG_HEAP_PLACE_FUNCTION_INTO_FLASH=y
+
+# Phase 1: BLE NUS over the C6 co-processor.
+# The P4 has no native radio; esp_hosted + esp_wifi_remote give NimBLE
+# a VHCI transport to the C6 over SDIO. The BT stack itself disables
+# its built-in controller (there isn't one on P4 anyway) — signalled
+# via BT_CONTROLLER_DISABLED=y.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_DISABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_TRANSPORT_UART=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+
+# Wire the BT host up through the esp_hosted VHCI layer.
+CONFIG_ESP_WIFI_REMOTE_LIBRARY_HOSTED=y
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
+
+# Phase 3: LE Secure Connections bonding only. Legacy SMP is disabled
+# (it doesn't protect against passive sniffers). MAX_BONDS=8 lets a
+# shared device accept up to eight different macbooks without erasing
+# an older bond. MITM + Display-only IO capability drives a passkey
+# shown on the aperture that the paired macbook must echo back.
+CONFIG_BT_NIMBLE_SM_SC=y
+# CONFIG_BT_NIMBLE_SM_LEGACY is not set
+CONFIG_BT_NIMBLE_MAX_BONDS=8

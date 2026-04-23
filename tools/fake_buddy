@@ -1,0 +1,5 @@
+#!/bin/sh
+# Launcher shim — runs fake_buddy.py with its pinned venv.
+set -e
+here="$(cd "$(dirname "$0")" && pwd)"
+exec "$here/.venv/bin/python" "$here/fake_buddy.py" "$@"

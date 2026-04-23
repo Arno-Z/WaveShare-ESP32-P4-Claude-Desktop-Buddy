@@ -1,0 +1,14 @@
+dependencies:
+  idf: ">=5.5"
+  waveshare/esp32_p4_wifi6_touch_lcd_xc: "^2.0.0"
+  # Radio is on the co-processor ESP32-C6; esp_hosted exposes it to the P4
+  # host over SDIO. The Waveshare BSP does not pull in the radio stack.
+  espressif/esp_hosted:
+    version: "*"
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_wifi_remote:
+    version: ">=1.3.1"
+    rules:
+      - if: "target in [esp32p4]"
+      - if: "idf_version <6.1"

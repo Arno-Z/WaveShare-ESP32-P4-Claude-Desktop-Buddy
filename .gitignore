@@ -1,0 +1,20 @@
+# ESP-IDF / build artifacts
+build/
+managed_components/
+dependencies.lock
+sdkconfig
+sdkconfig.old
+*.bin
+*.elf
+*.map
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+.obsidian/
+*.swp
+*.swo
+
+# Claude Code local
+.claude/settings.local.json
